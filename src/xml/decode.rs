@@ -3,6 +3,7 @@ use std::{error, fmt, io, str};
 use std::borrow::Cow;
 use bytes::Bytes;
 use quick_xml::events::{BytesStart, Event};
+use log::info;
 
 /// An XML reader.
 ///
@@ -74,6 +75,7 @@ impl<R: io::BufRead> Reader<R> {
 //------------ Element -------------------------------------------------------
 
 /// The start of an element.
+#[derive(Debug)]
 pub struct Element<'b, 'n> {
     start: BytesStart<'b>,
     ns: Option<&'n [u8]>,
@@ -113,6 +115,7 @@ impl<'b, 'n> Element<'b, 'n> {
 
 //------------ Content -------------------------------------------------------
 
+#[derive(Debug)]
 pub struct Content {
     empty: bool
 }
@@ -171,6 +174,7 @@ impl Content {
             let (ns, event) = reader.reader.read_namespaced_event(
                 &mut reader.buf, &mut reader.ns_buf
             ).map_err(Into::into)?;
+            info!("Event {:#?}", event);
             match event {
                 Event::Start(start) => {
                     op(Element::new(start, ns))?;

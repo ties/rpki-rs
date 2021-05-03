@@ -29,6 +29,7 @@ use ring::digest;
 use uuid::Uuid;
 use crate::uri;
 use crate::xml::decode::{Content, Error as XmlError, Reader, Name};
+use String;
 
 
 //------------ NotificationFile ----------------------------------------------
@@ -250,7 +251,7 @@ pub trait ProcessSnapshot {
                     Ok(())
                 }
                 _ => {
-                    info!("Bad attribute on snapshot.");
+                    info!("Bad attribute on snapshot: '{}'", String::from_utf8_lossy(name));
                     Err(XmlError::Malformed)
                 }
             })
@@ -265,12 +266,13 @@ pub trait ProcessSnapshot {
                 return Err(ProcessError::malformed().into())
             }
         }
-
         loop {
             let mut uri = None;
+            info!("outer: {:#?}", outer);
             let inner = outer.take_opt_element(&mut reader, |element| {
+                info!("element: {:#?}", element);
                 if element.name() != PUBLISH {
-                info!("Bad inner: not publish");
+                    info!("Bad inner: not publish");
                     return Err(ProcessError::malformed())
                 }
                 element.attributes(|name, value| match name {
@@ -279,11 +281,12 @@ pub trait ProcessSnapshot {
                         Ok(())
                     }
                     _ => {
-                        info!("Bad attribute on publish.");
+                        info!("Bad attribute on publish: '{}'.", String::from_utf8_lossy(name));
                         Err(ProcessError::malformed())
                     }
                 })
             })?;
+
             let mut inner = match inner {
                 Some(inner) => inner,
                 None => break
@@ -292,12 +295,14 @@ pub trait ProcessSnapshot {
                 Some(uri) => uri,
                 None => return Err(ProcessError::malformed().into())
             };
+
             ObjectReader::process_text(&mut inner, &mut reader, |reader| {
                 self.publish(uri, reader)
             })?;
             inner.take_end(&mut reader).map_err(Into::into)?;
         }
 
+        info!("before outer.take_end: {:#?}", outer);
         outer.take_end(&mut reader).map_err(Into::into)?;
         reader.end().map_err(Into::into)?;
         Ok(())
@@ -798,6 +803,11 @@ mod test {
 
     pub struct Test;
 
+    fn init() {
+        let _ = env_logger::builder().is_test(true).try_init();
+    }
+
+
     impl ProcessSnapshot for Test {
         type Err = ProcessError;
 
@@ -861,6 +871,24 @@ mod test {
                 include_bytes!("../test-data/lolz-notification.xml").as_ref()
             ).is_err()
         );
+    }
+
+    #[test]
+    fn snapshot_single_publish() {
+        init();
+        <Test as ProcessSnapshot>::process(
+            &mut Test,
+            include_bytes!("../test-data/snapshot-single-publish.xml").as_ref()
+        ).unwrap();
+    }
+
+    #[test]
+    fn snapshot_empty_publish() {
+        init();
+        <Test as ProcessSnapshot>::process(
+            &mut Test,
+            include_bytes!("../test-data/snapshot-empty-publish.xml").as_ref()
+        ).unwrap();
     }
 
     #[test]

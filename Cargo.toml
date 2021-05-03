@@ -32,6 +32,7 @@ untrusted       = { version = "0.7.0", optional = true }
 serde_json      = "1.0.40"
 serde_test      = "1.0"
 tokio           = { version="1.0", features=["net", "macros"]}
+env_logger      = "0.8.3"
 
 [features]
 default = []
